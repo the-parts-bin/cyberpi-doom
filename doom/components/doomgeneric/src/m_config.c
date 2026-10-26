@@ -1753,10 +1753,25 @@ static void SetVariable(default_t *def, char *value)
             {
                 intparm = scantokey[intparm];
             }
+#ifdef DG_CONFIG_DIR
+            // doomgeneric's own keys (KEY_FIRE etc., 0xa0..) have no
+            // scancode and are saved as-is: keep them. A 0 written by an
+            // earlier build that dropped them falls back to the default.
+            else if (intparm >= 128 && intparm < 256)
+            {
+            }
+#endif
             else
             {
                 intparm = 0;
             }
+
+#ifdef DG_CONFIG_DIR
+            if (intparm == 0)
+            {
+                break;
+            }
+#endif
 
             def->original_translated = intparm;
             * (int *) def->location = intparm;

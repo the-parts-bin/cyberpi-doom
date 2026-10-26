@@ -84,7 +84,9 @@ All behind defines set in `components/doomgeneric/CMakeLists.txt`:
   `main/audio.c`, `DG_music_module` from `i_oplmusic.c`); the SDL parts of
   `i_sound.c` are skipped on `ESP_PLATFORM`.
 - `m_config.c`: config load/save were compiled out upstream (`#if ORIGCODE`);
-  they're enabled when `DG_CONFIG_DIR` is set.
+  they're enabled when `DG_CONFIG_DIR` is set. Loading also keeps
+  doomgeneric's own key codes (fire, use, strafe: 0xa0–0xa3, which have no
+  scancode) instead of zeroing them, and a 0 binding falls back to the default.
 - `linker.lf`: Doom's .bss goes to PSRAM.
 
 Changes to the Chocolate Doom music code (not behind defines, since it isn't
