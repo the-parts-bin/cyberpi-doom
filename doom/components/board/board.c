@@ -224,6 +224,11 @@ uint16_t board_buttons(void)
     return (uint16_t)~aw_read_inputs(s_aw_io) & 0x017F;
 }
 
+void board_amp(bool on)
+{
+    set_p1(P1_AMP_EN, on);
+}
+
 void board_leds(const uint8_t rgb[15])
 {
     uint8_t buf[16] = {AW_REG_DIM0};

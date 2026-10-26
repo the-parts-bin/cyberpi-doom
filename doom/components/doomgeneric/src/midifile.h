@@ -133,6 +133,9 @@ typedef struct
 
 midi_file_t *MIDI_LoadFile(char *filename);
 
+// Load a MIDI file from a memory buffer (no temporary file needed).
+midi_file_t *MIDI_LoadMemory(void *buf, size_t len);
+
 // Free a MIDI file.
 
 void MIDI_FreeFile(midi_file_t *file);

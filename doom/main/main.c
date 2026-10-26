@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "audio.h"
 #include "board.h"
 #include "doomgeneric.h"
 #include "doomkeys.h"
@@ -185,8 +186,10 @@ void DG_DrawFrame(void)
     // Doom only writes default.cfg on quit, which never happens on a device
     // that gets switched off; save it whenever the menu closes instead.
     static boolean menu_was_active;
-    if (menu_was_active && !menuactive)
+    if (menu_was_active && !menuactive) {
         M_SaveDefaults();
+        ESP_LOGI(TAG, "menu closed: settings saved");
+    }
     menu_was_active = menuactive;
 
     if (!s_video_busy) {
@@ -227,6 +230,7 @@ void DG_DrawFrame(void)
 
 extern int messageToPrint;
 extern int screenblocks;
+extern int sfxVolume, musicVolume;
 extern boolean messageNeedsInput;
 
 static const uint16_t s_buttons_all[] = {
@@ -336,6 +340,7 @@ void DG_SetWindowTitle(const char *title)
 static void doom_task(void *arg)
 {
     board_init(40 * 1000 * 1000);
+    audio_init();
     video_init();
     ESP_ERROR_CHECK(wad_vfs_register());
     storage_init();
@@ -345,6 +350,8 @@ static void doom_task(void *arg)
     key_prevweapon = KEY_PREVWEAPON;
     key_nextweapon = KEY_NEXTWEAPON;
     screenblocks = 11; // full-screen view: the tall layout with our HUD
+    sfxVolume = 0;     // start muted; raise in Options -> Sound Volume
+    musicVolume = 0;
 
     static char *argv[] = {"doom", "-iwad", "/wad/doom1.wad", "-mb", "3", NULL};
     doomgeneric_Create(5, argv);

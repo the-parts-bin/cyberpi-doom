@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#if defined(FEATURE_SOUND) && !defined(__DJGPP__)
+#if defined(FEATURE_SOUND) && !defined(__DJGPP__) && !defined(ESP_PLATFORM)
 #include <SDL_mixer.h>
 #endif
 
@@ -408,7 +408,7 @@ void I_BindSoundVariables(void)
     M_BindVariable("snd_samplerate",    &snd_samplerate);
     M_BindVariable("snd_cachesize",     &snd_cachesize);
 
-#ifdef FEATURE_SOUND
+#if defined(FEATURE_SOUND) && !defined(ESP_PLATFORM)
     M_BindVariable("use_libsamplerate",   &use_libsamplerate);
     M_BindVariable("libsamplerate_scale", &libsamplerate_scale);
 #endif

@@ -26,5 +26,9 @@ void board_lcd_push(const uint16_t *fb);
 
 uint16_t board_buttons(void);
 
+// Speaker amplifier enable. Call before other tasks use the board, since it
+// shares the expander output register with the LCD control lines.
+void board_amp(bool on);
+
 // rgb: 5 LEDs x {r,g,b}
 void board_leds(const uint8_t rgb[15]);

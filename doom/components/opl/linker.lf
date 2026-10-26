@@ -1,0 +1,6 @@
+# Run the emulator from IRAM: from flash, its cache misses on core 0 contend
+# with core 1's PSRAM traffic on the shared SPI bus.
+[mapping:opl]
+archive: libopl.a
+entries:
+    dbopl (noflash)

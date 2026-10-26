@@ -15,12 +15,12 @@
 //     OPL interface.
 //
 
-#include "config.h"
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "SDL.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "opl.h"
 #include "opl_internal.h"
@@ -36,7 +36,7 @@ extern opl_driver_t opl_openbsd_driver;
 #ifdef _WIN32
 extern opl_driver_t opl_win32_driver;
 #endif
-extern opl_driver_t opl_sdl_driver;
+extern opl_driver_t opl_esp_driver;
 
 static opl_driver_t *drivers[] =
 {
@@ -49,7 +49,7 @@ static opl_driver_t *drivers[] =
 #ifdef _WIN32
     &opl_win32_driver,
 #endif
-    &opl_sdl_driver,
+    &opl_esp_driver,
     NULL
 };
 
@@ -57,6 +57,10 @@ static opl_driver_t *driver = NULL;
 static int init_stage_reg_writes = 1;
 
 unsigned int opl_sample_rate = 22050;
+
+// Register writes come from Doom's thread and from callbacks on the audio
+// task (other core); a register select + data write must not interleave.
+static SemaphoreHandle_t write_mutex;
 
 //
 // Init/shutdown code.
@@ -131,6 +135,11 @@ opl_init_result_t OPL_Init(unsigned int port_base)
     char *driver_name;
     int i;
     int result;
+
+    if (write_mutex == NULL)
+    {
+        write_mutex = xSemaphoreCreateMutex();
+    }
 
     driver_name = getenv("OPL_DRIVER");
 
@@ -238,6 +247,8 @@ void OPL_WriteRegister(int reg, int value)
 {
     int i;
 
+    xSemaphoreTake(write_mutex, portMAX_DELAY);
+
     if (reg & 0x100)
     {
         OPL_WritePort(OPL_REGISTER_PORT_OPL3, reg);
@@ -267,6 +278,8 @@ void OPL_WriteRegister(int reg, int value)
     }
 
     OPL_WritePort(OPL_DATA_PORT, value);
+
+    xSemaphoreGive(write_mutex);
 
     // Read the register port 24 times after writing the value to
     // cause the appropriate delay
@@ -450,59 +463,24 @@ void OPL_Unlock(void)
     }
 }
 
-typedef struct
+static void DelayCallback(void *waiter)
 {
-    int finished;
-
-    SDL_mutex *mutex;
-    SDL_cond *cond;
-} delay_data_t;
-
-static void DelayCallback(void *_delay_data)
-{
-    delay_data_t *delay_data = _delay_data;
-
-    SDL_LockMutex(delay_data->mutex);
-    delay_data->finished = 1;
-
-    SDL_CondSignal(delay_data->cond);
-
-    SDL_UnlockMutex(delay_data->mutex);
+    xTaskNotifyGive((TaskHandle_t) waiter);
 }
 
 void OPL_Delay(uint64_t us)
 {
-    delay_data_t delay_data;
-
     if (driver == NULL)
     {
         return;
     }
 
-    // Create a callback that will signal this thread after the
-    // specified time.
+    // The callback fires on the audio task once it has rendered past this
+    // time. A task notification leaves nothing to delete afterwards, unlike a
+    // semaphore the other core might still be inside when this task wakes.
 
-    delay_data.finished = 0;
-    delay_data.mutex = SDL_CreateMutex();
-    delay_data.cond = SDL_CreateCond();
-
-    OPL_SetCallback(us, DelayCallback, &delay_data);
-
-    // Wait until the callback is invoked.
-
-    SDL_LockMutex(delay_data.mutex);
-
-    while (!delay_data.finished)
-    {
-        SDL_CondWait(delay_data.cond, delay_data.mutex);
-    }
-
-    SDL_UnlockMutex(delay_data.mutex);
-
-    // Clean up.
-
-    SDL_DestroyMutex(delay_data.mutex);
-    SDL_DestroyCond(delay_data.cond);
+    OPL_SetCallback(us, DelayCallback, xTaskGetCurrentTaskHandle());
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 }
 
 void OPL_SetPaused(int paused)

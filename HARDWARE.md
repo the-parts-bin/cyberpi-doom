@@ -37,6 +37,10 @@ separate transactions (a 2-byte read returns garbage for port 1).
 ## Audio
 - Speaker: built-in DAC right channel (GPIO25) via I2S_NUM_0 DAC mode, 16-bit, 20 kHz in Makeblock code
 - Amp enable: AW9523B P1_3 high
+- The amp is loud: one step of the 8-bit DAC is clearly audible. A constant
+  128 is silent. The IDF `dac_continuous` driver works up to at least
+  352.8 kHz (APLL), but each DMA descriptor must stay under ~4 KB, and each
+  8-bit sample takes 16 bits of DMA.
 
 ## Stock flash layout
 See backup/README.md.

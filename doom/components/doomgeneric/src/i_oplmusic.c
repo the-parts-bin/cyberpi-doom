@@ -32,6 +32,13 @@
 #include "z_zone.h"
 
 #include "opl.h"
+
+// From Chocolate Doom's i_sound.h, which doomgeneric's lacks
+typedef enum
+{
+    opl_v_old,   // Hexen, Heretic
+    opl_v_new    // Doom, Strife
+} opl_driver_ver_t;
 #include "midifile.h"
 
 // #define OPL_MIDI_DEBUG
@@ -645,6 +652,11 @@ static void I_OPL_SetMusicVolume(int volume)
 {
     unsigned int i;
 
+    // Callbacks run on the other core here, so keep them out while the
+    // voices are being changed (upstream only locks in StopSong).
+
+    OPL_Lock();
+
     // Internal state variable.
 
     current_music_volume = volume;
@@ -658,6 +670,8 @@ static void I_OPL_SetMusicVolume(int volume)
             SetVoiceVolume(&voices[i], voices[i].note_volume);
         }
     }
+
+    OPL_Unlock();
 }
 
 static void VoiceKeyOff(opl_voice_t *voice)
@@ -1429,6 +1443,8 @@ static void I_OPL_PlaySong(void *handle, boolean looping)
 
     file = handle;
 
+    OPL_Lock();
+
     // Allocate track data.
 
     tracks = malloc(MIDI_NumTracks(file) * sizeof(opl_track_data_t));
@@ -1448,6 +1464,8 @@ static void I_OPL_PlaySong(void *handle, boolean looping)
     {
         StartTrack(file, i);
     }
+
+    OPL_Unlock();
 }
 
 static void I_OPL_PauseSong(void)
@@ -1458,6 +1476,8 @@ static void I_OPL_PauseSong(void)
     {
         return;
     }
+
+    OPL_Lock();
 
     // Pause OPL callbacks.
 
@@ -1474,6 +1494,8 @@ static void I_OPL_PauseSong(void)
             VoiceKeyOff(&voices[i]);
         }
     }
+
+    OPL_Unlock();
 }
 
 static void I_OPL_ResumeSong(void)
@@ -1582,6 +1604,38 @@ static void *I_OPL_RegisterSong(void *data, int len)
     {
         return NULL;
     }
+
+#ifdef ESP_PLATFORM
+    // No /tmp here, and writing flash on every level change is pointless:
+    // convert MUS to MIDI in memory and parse it from there.
+    if (IsMid(data, len) && len < MAXMIDLENGTH)
+    {
+        result = MIDI_LoadMemory(data, len);
+    }
+    else
+    {
+        MEMFILE *instream = mem_fopen_read(data, len);
+        MEMFILE *outstream = mem_fopen_write();
+        void *outbuf;
+        size_t outbuf_len;
+
+        result = NULL;
+        if (mus2mid(instream, outstream) == 0)
+        {
+            mem_get_buf(outstream, &outbuf, &outbuf_len);
+            result = MIDI_LoadMemory(outbuf, outbuf_len);
+        }
+        mem_fclose(instream);
+        mem_fclose(outstream);
+    }
+
+    if (result == NULL)
+    {
+        fprintf(stderr, "I_OPL_RegisterSong: Failed to load MID.\n");
+    }
+
+    return result;
+#endif
 
     // MUS files begin with "MUS"
     // Reject anything which doesnt have this signature

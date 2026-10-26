@@ -102,6 +102,16 @@ static size_t wad_length(void)
     return end;
 }
 
+const void *wad_vfs_mmap(size_t offset, size_t len)
+{
+    const void *ptr;
+    esp_partition_mmap_handle_t handle;
+    if (!s_part || offset + len > s_size ||
+        esp_partition_mmap(s_part, offset, len, ESP_PARTITION_MMAP_DATA, &ptr, &handle) != ESP_OK)
+        return NULL;
+    return ptr;
+}
+
 esp_err_t wad_vfs_register(void)
 {
     s_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x40, "wad");

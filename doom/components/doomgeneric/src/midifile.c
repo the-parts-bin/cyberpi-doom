@@ -24,6 +24,10 @@
 #include "i_swap.h"
 #include "midifile.h"
 
+// doomgeneric's i_swap.h has no SDL; MIDI data is big-endian, the ESP32 little.
+#define SDL_SwapBE16(x) __builtin_bswap16(x)
+#define SDL_SwapBE32(x) __builtin_bswap32(x)
+
 #define HEADER_CHUNK_ID "MThd"
 #define TRACK_CHUNK_ID  "MTrk"
 #define MAX_BUFFER_SIZE 0x10000
@@ -624,6 +628,43 @@ midi_file_t *MIDI_LoadFile(char *filename)
     // Read all tracks:
 
     if (!ReadAllTracks(file, stream))
+    {
+        fclose(stream);
+        MIDI_FreeFile(file);
+        return NULL;
+    }
+
+    fclose(stream);
+
+    return file;
+}
+
+midi_file_t *MIDI_LoadMemory(void *buf, size_t len)
+{
+    midi_file_t *file;
+    FILE *stream;
+
+    file = malloc(sizeof(midi_file_t));
+
+    if (file == NULL)
+    {
+        return NULL;
+    }
+
+    file->tracks = NULL;
+    file->num_tracks = 0;
+    file->buffer = NULL;
+    file->buffer_size = 0;
+
+    stream = fmemopen(buf, len, "rb");
+
+    if (stream == NULL)
+    {
+        MIDI_FreeFile(file);
+        return NULL;
+    }
+
+    if (!ReadFileHeader(file, stream) || !ReadAllTracks(file, stream))
     {
         fclose(stream);
         MIDI_FreeFile(file);
