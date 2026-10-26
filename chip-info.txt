@@ -1,0 +1,22 @@
+esptool v5.6.0
+Serial port /dev/ttyUSB0:
+Connecting....
+Detecting chip type... ESP32
+Connected to ESP32 on /dev/ttyUSB0:
+Chip type:          ESP32-D0WD (revision v1.1)
+Features:           Wi-Fi, BT, Dual Core + LP Core, 240MHz, Vref calibration in eFuse, Coding Scheme None
+Crystal frequency:  40MHz
+MAC:                34:5f:45:de:fd:1c
+
+Uploading stub flasher...
+Running stub flasher...
+Stub flasher running.
+
+Flash Memory Information:
+=========================
+Manufacturer: c8
+Device: 4017
+Detected flash size: 8MB
+Flash voltage set by a strapping pin: 3.3V
+
+Hard resetting via RTS pin...

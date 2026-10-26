@@ -1,0 +1,16 @@
+# ESP-IDF build output and generated config (sdkconfig.defaults is tracked)
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# Python venv for esptool
+.venv/
+
+# Upstream checkouts used for reference
+ref/
+
+# Large binaries, kept locally (checksums are tracked)
+wad/*.wad
+backup/*.bin

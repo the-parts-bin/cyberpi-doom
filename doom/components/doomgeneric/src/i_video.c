@@ -333,6 +333,7 @@ void I_FinishUpdate (void)
     //x_offset     = 0;
     x_offset_end = ((s_Fb.xres - (SCREENWIDTH  * fb_scaling)) * s_Fb.bits_per_pixel/8) - x_offset;
 
+#ifndef DG_DIRECT_VIDEOBUFFER // CyberPi: DG_DrawFrame reads I_VideoBuffer itself
     /* DRAW SCREEN */
     line_in  = (unsigned char *) I_VideoBuffer;
     line_out = (unsigned char *) DG_ScreenBuffer;
@@ -366,6 +367,7 @@ void I_FinishUpdate (void)
         line_in += SCREENWIDTH;
     }
 
+#endif
 	DG_DrawFrame();
 }
 

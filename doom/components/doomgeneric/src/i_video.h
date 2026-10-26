@@ -25,7 +25,11 @@
 // Screen width and height.
 
 #define SCREENWIDTH  320
+#ifdef DG_SCREENHEIGHT
+#define SCREENHEIGHT DG_SCREENHEIGHT // CyberPi: taller frame, same horizontal FOV
+#else
 #define SCREENHEIGHT 200
+#endif
 
 // Screen width used for "squash" scale functions
 

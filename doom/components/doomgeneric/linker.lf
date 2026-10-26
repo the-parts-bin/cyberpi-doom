@@ -1,0 +1,10 @@
+# Doom's static tables (~240 KB of .bss) don't fit in internal DRAM; put them in PSRAM.
+[scheme:doom_extram_bss]
+entries:
+    bss -> extern_ram
+    common -> extern_ram
+
+[mapping:doomgeneric]
+archive: libdoomgeneric.a
+entries:
+    * (doom_extram_bss)

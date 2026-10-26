@@ -634,6 +634,12 @@ void M_DoSave(int slot)
 //
 void M_SaveSelect(int choice)
 {
+#ifdef DG_AUTO_SAVE_NAMES
+    // No keyboard: name the save after its slot and save right away
+    snprintf(savegamestrings[choice], SAVESTRINGSIZE, "SLOT %d", choice + 1);
+    M_DoSave(choice);
+    return;
+#endif
     // we are going to be intercepting all chars
     saveStringEnter = 1;
     

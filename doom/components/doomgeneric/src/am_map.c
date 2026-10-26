@@ -199,7 +199,11 @@ static int 	leveljuststarted = 1; 	// kluge until AM_LevelInit() is called
 
 boolean    	automapactive = false;
 static int 	finit_width = SCREENWIDTH;
+#ifdef DG_NO_AUTOMAP_STATUSBAR
+static int 	finit_height = SCREENHEIGHT;
+#else
 static int 	finit_height = SCREENHEIGHT - 32;
+#endif
 
 // location of window on screen
 static int 	f_x;
