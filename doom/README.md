@@ -22,8 +22,8 @@ Doom renders 320×232 instead of 320×200. In game that is scaled to 128×112,
 which keeps Doom's 4:3 pixel aspect and horizontal FOV and adds vertical view,
 with a native 16-row HUD below (health, armor, ammo, keys). Title,
 intermission and finale screens are drawn for 320×200 and stay letterboxed
-at 128×96. Use the full-screen size (Options → Screen Size, all the way up)
-to hide Doom's own status bar.
+at 128×96. The screen size defaults to full screen (Options → Screen Size,
+all the way up); smaller sizes also show Doom's own status bar.
 
 ## Sound
 
