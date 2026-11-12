@@ -28,7 +28,11 @@
 // NET_MAXPLAYERS, as there may be observers that are not participating
 // (eg. left/right monitors)
 
+#ifdef DG_MAXNETNODES
+#define MAXNETNODES DG_MAXNETNODES
+#else
 #define MAXNETNODES 16
+#endif
 
 // The maximum number of players, multiplayer/networking.
 // This is the maximum supported by the networking code; individual games

@@ -1,4 +1,5 @@
 // doomgeneric platform layer for the Makeblock CyberPi.
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -9,6 +10,7 @@
 #include "esp_attr.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -18,14 +20,20 @@
 #include "doomstat.h"
 #include "esp_vfs_fat.h"
 #include "i_video.h"
+#include "launcher.h"
 #include "m_config.h"
 #include "m_controls.h"
+#include "netplay.h"
 #include "r_state.h"
+#include "remote.h"
+#include "ui.h"
 #include "wad_vfs.h"
 
 static const char *TAG = "doom";
 
-// Two layouts, both 128 wide (320 -> 128 is exactly 5:2):
+// Doom renders in low detail: 160 distinct columns, each written twice into
+// its 320-wide buffer. The snapshot keeps every other column, and 160 -> 128
+// is 5:4. Two layouts, both 128 wide:
 // - tall: gameplay, 320x232 -> 128x112 plus a 16-row HUD below. With smaller
 //   screen sizes Doom's own status bar also shows, at the bottom of the 232.
 //   The extra 32 rows add vertical FOV; the horizontal FOV is unchanged.
@@ -36,6 +44,8 @@ static const char *TAG = "doom";
 #define TALL_H (LCD_H - HUD_H)
 #define CLASSIC_H 96
 #define CLASSIC_Y ((LCD_H - CLASSIC_H) / 2)
+
+#define SNAP_W (SCREENWIDTH / 2)
 
 // Doom renders on core 1. DG_DrawFrame snapshots the 8-bit frame, palette and
 // HUD values into internal RAM and hands them to a core 0 task that scales
@@ -54,23 +64,26 @@ static volatile bool s_video_busy;
 
 static uint16_t *s_fb;
 static uint16_t s_ys_tall[TALL_H + 1], s_ys_classic[CLASSIC_H + 1];
-static uint16_t s_recip[10];
+static uint16_t s_recip[16];
 
-static int64_t s_t_snap, s_t_conv, s_t_push, s_t_last_log;
+static int64_t s_t_snap, s_t_conv, s_t_push, s_t_sleep, s_t_last_log;
 static int s_rendered, s_shown;
 
 // ---- video ------------------------------------------------------------------
 
-// Up to 9 source pixels are summed per output pixel. With 7-bit channels in
-// 11-bit lanes the sum (max 9 * 127) can't carry into the next lane.
+// Each output pixel sums up to 3 rows of 5 weighted quarter-pixels, so a lane
+// must hold 15x a channel. Green and blue are 7-bit in 11-bit lanes (max
+// 1905); red, in the 10 bits left at the top, is 6-bit (max 945). The panel
+// shows 5-bit red anyway.
 static uint32_t pack_color(const struct color *c)
 {
-    return (c->r >> 1) << 22 | (c->g >> 1) << 11 | (c->b >> 1);
+    return (c->r >> 2) << 22 | (c->g >> 1) << 11 | (c->b >> 1);
 }
 
-// Box-filter the 8-bit frame to 128 x rows RGB565 (big-endian for the panel)
-// at panel row out_y. Every 5 source pixels become two outputs averaging 2 and
-// 3 pixels; each output row sums the 2 or 3 source rows given by ys. Lives in
+// Box-filter the 160-wide snapshot to 128 x rows RGB565 (big-endian for the
+// panel) at panel row out_y. Every 5 source pixels become 4 outputs, each
+// covering 1.25 source pixels (weights in quarters: 4+1, 3+2, 2+3, 1+4); each
+// output row sums the 2 or 3 source rows given by ys. Lives in
 // IRAM so core 0 never waits on the flash cache while core 1 keeps the SPI bus
 // busy with PSRAM traffic.
 static IRAM_ATTR void convert_frame(const uint8_t *src, const uint32_t *pal,
@@ -83,23 +96,24 @@ static IRAM_ATTR void convert_frame(const uint8_t *src, const uint32_t *pal,
         int y0 = ys[y], y1 = ys[y + 1];
         memset(hsum, 0, sizeof(hsum));
         for (int sy = y0; sy < y1; sy++) {
-            const uint8_t *p = src + sy * SCREENWIDTH;
+            const uint8_t *p = src + sy * SNAP_W;
             uint32_t *h = hsum;
-            for (int i = 0; i < OUT_W / 2; i++, p += 5, h += 2) {
-                h[0] += pal[p[0]] + pal[p[1]];
-                h[1] += pal[p[2]] + pal[p[3]] + pal[p[4]];
+            for (int i = 0; i < OUT_W / 4; i++, p += 5, h += 4) {
+                uint32_t c0 = pal[p[0]], c1 = pal[p[1]], c2 = pal[p[2]], c3 = pal[p[3]], c4 = pal[p[4]];
+                h[0] += 4 * c0 + c1;
+                h[1] += 3 * c1 + 2 * c2;
+                h[2] += 2 * c2 + 3 * c3;
+                h[3] += c3 + 4 * c4;
             }
         }
 
-        unsigned n = y1 - y0;
-        unsigned k2 = s_recip[2 * n], k3 = s_recip[3 * n];
+        unsigned k = s_recip[5 * (y1 - y0)];
         for (int x = 0; x < OUT_W; x++) {
             uint32_t acc = hsum[x];
-            unsigned k = (x & 1) ? k3 : k2;
-            unsigned r = (((acc >> 22) & 0x7FF) * k) >> 16; // 7-bit averages
-            unsigned g = (((acc >> 11) & 0x7FF) * k) >> 16;
+            unsigned r = ((acc >> 22) * k) >> 16; // 6-bit average
+            unsigned g = (((acc >> 11) & 0x7FF) * k) >> 16; // 7-bit averages
             unsigned b = ((acc & 0x7FF) * k) >> 16;
-            uint16_t c = (r >> 2) << 11 | (g >> 1) << 5 | (b >> 2);
+            uint16_t c = (r >> 1) << 11 | (g >> 1) << 5 | (b >> 2);
             *out++ = (c >> 8) | (c << 8);
         }
     }
@@ -107,7 +121,7 @@ static IRAM_ATTR void convert_frame(const uint8_t *src, const uint32_t *pal,
 
 static void video_task(void *arg)
 {
-    bool was_tall = false;
+    int was_tall = -1; // first frame: clear what the launcher or lobby left
     for (;;) {
         xSemaphoreTake(s_frame_ready, portMAX_DELAY);
         const frame_info_t *f = &s_snap_info;
@@ -131,13 +145,22 @@ static void video_task(void *arg)
     }
 }
 
-// Called before the Doom task exists: the 74 KB snapshot needs one contiguous
+// Called before the Doom task exists: the 37 KB snapshot needs one contiguous
 // internal block, which the task's stack would otherwise split.
 static void video_alloc(void)
 {
-    s_snap = heap_caps_malloc(SCREENWIDTH * SCREENHEIGHT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    s_snap = heap_caps_malloc(SNAP_W * SCREENHEIGHT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     s_fb = heap_caps_calloc(LCD_W * LCD_H, 2, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     assert(s_fb && s_snap);
+}
+
+// Wi-Fi needs the internal RAM, so network games keep the snapshot in PSRAM
+// instead, at some cost in frame rate.
+static void video_snapshot_to_psram(void)
+{
+    free(s_snap);
+    s_snap = heap_caps_malloc(SNAP_W * SCREENHEIGHT, MALLOC_CAP_SPIRAM);
+    assert(s_snap);
 }
 
 static void video_init(void)
@@ -146,12 +169,23 @@ static void video_init(void)
         s_ys_tall[y] = y * SCREENHEIGHT / TALL_H;
     for (int y = 0; y <= CLASSIC_H; y++)
         s_ys_classic[y] = y * 200 / CLASSIC_H;
-    for (int n = 1; n < 10; n++)
+    for (int n = 2; n < 16; n++)
         s_recip[n] = 65536 / n;
     ESP_LOGI(TAG, "internal heap left: %u bytes", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
     s_frame_ready = xSemaphoreCreateBinary();
     xTaskCreatePinnedToCore(video_task, "video", 4096, NULL, 5, NULL, 0);
+}
+
+// Copies every other column (the low-detail render writes each one twice).
+static void snapshot_columns(uint8_t *dst, const uint8_t *src)
+{
+    const uint32_t *s = (const uint32_t *)src;
+    uint16_t *d = (uint16_t *)dst;
+    for (int i = 0; i < SCREENWIDTH * SCREENHEIGHT / 4; i++) {
+        uint32_t v = s[i];
+        d[i] = (v & 0xFF) | ((v >> 8) & 0xFF00); // bytes 0 and 2
+    }
 }
 
 static void read_hud(hud_state_t *h)
@@ -166,6 +200,11 @@ static void read_hud(hud_state_t *h)
     for (int k = 0; k < 3; k++)
         if (p->cards[it_bluecard + k] || p->cards[it_blueskull + k])
             h->keys |= 1 << k;
+    // Frags as Doom's status bar counts them: kills minus suicides.
+    h->deathmatch = deathmatch;
+    h->frags = 0;
+    for (int i = 0; i < MAXPLAYERS; i++)
+        h->frags += i == consoleplayer ? -p->frags[i] : p->frags[i];
 }
 
 void DG_Init(void)
@@ -194,7 +233,7 @@ void DG_DrawFrame(void)
 
     if (!s_video_busy) {
         frame_info_t *f = &s_snap_info;
-        memcpy(s_snap, I_VideoBuffer, SCREENWIDTH * SCREENHEIGHT);
+        snapshot_columns(s_snap, I_VideoBuffer);
         memcpy(f->pal, s_pal, sizeof(s_pal));
         f->tall = gamestate == GS_LEVEL;
         if (f->tall)
@@ -208,10 +247,14 @@ void DG_DrawFrame(void)
     if (t1 - s_t_last_log > 5000000) {
         float secs = (t1 - s_t_last_log) / 1e6f;
         int shown = s_shown ? s_shown : 1;
-        ESP_LOGI(TAG, "render %.1f fps, shown %.1f fps | snapshot %lld us, convert %lld us, push %lld us",
-                 s_rendered / secs, s_shown / secs, s_t_snap / s_rendered, s_t_conv / shown, s_t_push / shown);
+        ESP_LOGI(TAG, "render %.1f fps, shown %.1f fps | snapshot %lld us, convert %lld us, push %lld us | "
+                      "waiting %.0f%% | internal RAM %u free, largest %u | stack %u unused",
+                 s_rendered / secs, s_shown / secs, s_t_snap / s_rendered, s_t_conv / shown, s_t_push / shown,
+                 s_t_sleep / (secs * 1e4f), (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+                 (unsigned)uxTaskGetStackHighWaterMark(NULL));
         s_t_last_log = t1;
-        s_t_snap = s_t_conv = s_t_push = 0;
+        s_t_snap = s_t_conv = s_t_push = s_t_sleep = 0;
         s_rendered = s_shown = 0;
     }
 }
@@ -240,7 +283,9 @@ static const uint16_t s_buttons_all[] = {
 
 static unsigned char key_for(uint16_t bit, uint16_t held)
 {
-    bool in_menu = menuactive || gamestate != GS_LEVEL;
+    // Intermission and finale screens advance on fire/use, so only the
+    // menus and the title loop count as menus.
+    bool in_menu = menuactive || gamestate == GS_DEMOSCREEN;
     bool prompt = messageToPrint && messageNeedsInput;
     bool mod = !in_menu && (held & BTN_B);
 
@@ -322,10 +367,12 @@ static void storage_init(void)
 
 void DG_SleepMs(uint32_t ms)
 {
+    int64_t t0 = esp_timer_get_time();
     if (ms)
         vTaskDelay(pdMS_TO_TICKS(ms));
     else
         taskYIELD();
+    s_t_sleep += esp_timer_get_time() - t0;
 }
 
 uint32_t DG_GetTicksMs(void)
@@ -337,9 +384,23 @@ void DG_SetWindowTitle(const char *title)
 {
 }
 
+// Quitting or an error restarts into the launcher; an error's message is
+// shown there.
+void DG_Quit(void)
+{
+    esp_restart();
+}
+
+void DG_Error(const char *message)
+{
+    netplay_set_message(message);
+    esp_restart();
+}
+
 static void doom_task(void *arg)
 {
     board_init(40 * 1000 * 1000);
+    remote_init(s_fb);
     audio_init();
     video_init();
     ESP_ERROR_CHECK(wad_vfs_register());
@@ -353,8 +414,20 @@ static void doom_task(void *arg)
     sfxVolume = 0;     // start muted; raise in Options -> Sound Volume
     musicVolume = 0;
 
-    static char *argv[] = {"doom", "-iwad", "/wad/doom1.wad", "-mb", "3", NULL};
-    doomgeneric_Create(5, argv);
+    ui_init(s_fb);
+    const char *server = NULL;
+    launch_mode_t mode = launcher_run(&server, video_snapshot_to_psram);
+
+    char *argv[8] = {"doom", "-iwad", "/wad/doom1.wad", "-mb", "3"};
+    int argc = 5;
+    if (mode == LAUNCH_HOST) {
+        argv[argc++] = "-privateserver"; // a server without master-server registration
+    } else if (mode == LAUNCH_JOIN) {
+        argv[argc++] = "-connect";
+        argv[argc++] = (char *)server;
+    }
+    argv[argc] = NULL;
+    doomgeneric_Create(argc, argv);
     for (;;)
         doomgeneric_Tick();
 }

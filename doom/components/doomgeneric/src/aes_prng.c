@@ -31,6 +31,9 @@
 #include "doomtype.h"
 #include "i_swap.h"
 
+// doomgeneric's i_swap.h has no SDL; the ESP32 is little-endian.
+#define SDL_SwapLE32(x) (x)
+
 /*
  * Cryptographic API.
  *

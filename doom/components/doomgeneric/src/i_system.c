@@ -47,6 +47,7 @@
 #include "i_video.h"
 
 #include "i_system.h"
+#include "doomgeneric.h"
 
 #include "w_wad.h"
 #include "z_zone.h"
@@ -261,6 +262,8 @@ void I_Quit (void)
     SDL_Quit();
 
     exit(0);
+#elif defined(DG_PLATFORM_EXIT)
+    DG_Quit();
 #endif
 }
 
@@ -402,6 +405,10 @@ void I_Error (char *error, ...)
 
         entry = entry->next;
     }
+
+#ifdef DG_PLATFORM_EXIT
+    DG_Error(msgbuf);
+#endif
 
     exit_gui_popup = !M_ParmExists("-nogui");
 

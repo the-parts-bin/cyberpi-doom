@@ -56,12 +56,17 @@ This writes all 8 MB (a few minutes) and replaces everything, Doom and its
 saves included. The CyberPi then boots the Makeblock firmware again and works
 with mBlock as before.
 
-## My dump (2026-10-21)
+## My dumps
 
-- Stock Makeblock firmware 44.01.016 (build Nov 14 2025)
-- ESP32-D0WD rev 1.1, 8 MB GigaDevice flash (c8/4017)
-- The two reads differ only in NVS (0xb000–0xcfff); all code and data
-  partitions are identical.
+Both boards ran stock Makeblock firmware 44.01.016 (build Nov 14 2025), on an
+ESP32-D0WD rev 1.1 with 8 MB GigaDevice flash (c8/4017).
+
+- `cyberpi-flash-8MB*.bin` (first board, 2026-10-21): the two reads differ
+  only in NVS (0xb000–0xcfff); all code and data partitions are identical.
+- `cyberpi2-flash-8MB*.bin` (second board, 2026-11-12): the two reads are
+  identical.
+
+Each dump belongs to its own board: restore it to the board it came from.
 - Stock partitions: nvs 0x9000, otadata 0xd000, phy_init 0xf000,
   factory 0x10000 (960 KB), ota_0 0x100000 (3.5 MB), storage 0x480000 (3 MB),
   unused 0x780000–0x800000.

@@ -657,6 +657,12 @@ R_SetViewSize
 {
     setsizeneeded = true;
     setblocks = blocks;
+#ifdef DG_LOW_DETAIL_ONLY
+    // The platform only reads every other column, so always render 160
+    // columns (Doom's low detail).
+    extern int detailLevel;
+    detailLevel = detail = 1;
+#endif
     setdetail = detail;
 }
 

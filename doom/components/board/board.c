@@ -3,6 +3,7 @@
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -219,9 +220,21 @@ static uint16_t aw_read_inputs(i2c_master_dev_handle_t dev)
     return in0 | (in1 << 8);
 }
 
+static volatile uint16_t s_virtual_buttons;
+static volatile int64_t s_virtual_until;
+
 uint16_t board_buttons(void)
 {
-    return (uint16_t)~aw_read_inputs(s_aw_io) & 0x017F;
+    uint16_t b = (uint16_t)~aw_read_inputs(s_aw_io) & 0x017F;
+    if (s_virtual_buttons && esp_timer_get_time() < s_virtual_until)
+        b |= s_virtual_buttons;
+    return b;
+}
+
+void board_press(uint16_t buttons, uint32_t ms)
+{
+    s_virtual_until = esp_timer_get_time() + ms * 1000LL;
+    s_virtual_buttons = buttons;
 }
 
 void board_amp(bool on)

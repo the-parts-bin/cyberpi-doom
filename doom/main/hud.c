@@ -79,6 +79,11 @@ void hud_draw(uint16_t *fb, int y, const hud_state_t *s)
     bitmap(70, iy, s_icon_ammo, 7, 7, 1, COL_AMMO);
     number(79, ty, s->ammo, COL_TEXT);
 
+    if (s->deathmatch) {
+        number(105, ty, s->frags, COL_YELLOW);
+        return;
+    }
+
     static const uint16_t key_col[3] = {COL_BLUE, COL_YELLOW, COL_LOW};
     for (int k = 0; k < 3; k++)
         if (s->keys & (1 << k))

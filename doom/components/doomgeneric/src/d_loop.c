@@ -307,7 +307,7 @@ void D_StartGameLoop(void)
     lasttime = GetAdjustedTime() / ticdup;
 }
 
-#if ORIGCODE
+#if ORIGCODE || defined(FEATURE_MULTIPLAYER)
 //
 // Block until the game start message is received from the server.
 //
@@ -340,7 +340,7 @@ static void BlockUntilStart(net_gamesettings_t *settings,
 void D_StartNetGame(net_gamesettings_t *settings,
                     netgame_startup_callback_t callback)
 {
-#if ORIGCODE
+#if ORIGCODE || defined(FEATURE_MULTIPLAYER)
     int i;
 
     offsetms = 0;

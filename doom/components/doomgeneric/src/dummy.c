@@ -24,9 +24,13 @@
  *  public data                                                        *
  *---------------------------------------------------------------------*/
 
+#ifndef FEATURE_MULTIPLAYER
+
 boolean net_client_connected = false;
 
 boolean drone = false;
+
+#endif
 
 /*---------------------------------------------------------------------*
  *  private data                                                       *

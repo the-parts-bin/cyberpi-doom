@@ -26,6 +26,10 @@ void board_lcd_push(const uint16_t *fb);
 
 uint16_t board_buttons(void);
 
+// Holds the given buttons down for ms, in addition to the real ones (for
+// remote control while testing).
+void board_press(uint16_t buttons, uint32_t ms);
+
 // Speaker amplifier enable. Call before other tasks use the board, since it
 // shares the expander output register with the LCD control lines.
 void board_amp(bool on);

@@ -7,7 +7,9 @@ idf_component_register(SRCS ${DG_SRCS}
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
     CMAP256 DOOMGENERIC_RESX=320 DOOMGENERIC_RESY=232 DG_SCREENHEIGHT=232
     DG_DIRECT_VIDEOBUFFER DG_AUTO_SAVE_NAMES DG_NO_AUTOMAP_STATUSBAR
-    "DG_CONFIG_DIR=\"/data/\"" FEATURE_SOUND)
+    "DG_CONFIG_DIR=\"/data/\"" FEATURE_SOUND
+    FEATURE_MULTIPLAYER DG_NET_LOBBY DG_PLATFORM_EXIT DG_MAXNETNODES=6
+    DG_QUIT_NO_PROMPT DG_LOW_DETAIL_ONLY)
 # Chocolate Doom's OPL music player, exported as doomgeneric's music module
 set_source_files_properties(src/i_oplmusic.c PROPERTIES
     COMPILE_DEFINITIONS "music_opl_module=DG_music_module")

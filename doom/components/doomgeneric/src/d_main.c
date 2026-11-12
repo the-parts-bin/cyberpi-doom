@@ -1078,6 +1078,11 @@ static void D_Endoom(void)
         return;
     }
 
+#ifdef DG_PLATFORM_EXIT
+    // No text screen to show it on; the platform's DG_Quit takes over.
+    return;
+#endif
+
     endoom = W_CacheLumpName(DEH_String("ENDOOM"), PU_STATIC);
 
     I_Endoom(endoom);

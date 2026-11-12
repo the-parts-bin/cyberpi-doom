@@ -37,6 +37,8 @@
 #include "deh_main.h"
 
 #include "d_loop.h"
+#include "doomgeneric.h"
+#include "net_client.h"
 
 ticcmd_t *netcmds;
 
@@ -154,6 +156,13 @@ static void SaveGameSettings(net_gamesettings_t *settings)
 
     settings->lowres_turn = M_CheckParm("-record") > 0
                          && M_CheckParm("-longtics") == 0;
+
+#ifdef DG_NET_LOBBY
+    if (netgame)
+    {
+        DG_NetGameSettings(settings);
+    }
+#endif
 }
 
 static void InitConnectData(net_connect_data_t *connect_data)
@@ -215,6 +224,10 @@ static void InitConnectData(net_connect_data_t *connect_data)
 void D_ConnectNetGame(void)
 {
     net_connect_data_t connect_data;
+
+#ifdef DG_NET_LOBBY
+    net_player_name = (char *) DG_NetPlayerName();
+#endif
 
     InitConnectData(&connect_data);
     netgame = D_InitNetGame(&connect_data);

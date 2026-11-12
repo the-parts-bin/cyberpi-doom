@@ -1173,6 +1173,11 @@ static char *M_SelectEndMessage(void)
 
 void M_QuitDOOM(int choice)
 {
+#ifdef DG_QUIT_NO_PROMPT
+    I_Quit();
+    return;
+#endif
+
     DEH_snprintf(endstring, sizeof(endstring), "%s\n\n" DOSY,
                  DEH_String(M_SelectEndMessage()));
 
@@ -1202,6 +1207,9 @@ void M_ChangeSensitivity(int choice)
 
 void M_ChangeDetail(int choice)
 {
+#ifdef DG_LOW_DETAIL_ONLY
+    return;
+#endif
     choice = 0;
     detailLevel = 1 - detailLevel;
 
