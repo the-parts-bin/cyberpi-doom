@@ -21,7 +21,44 @@ a speaker.
 | [backup/](backup/) | How to back up and restore the stock Makeblock firmware. |
 | `chip-info.txt` | esptool's readout of the board. |
 
-## Getting started
+## Install the prebuilt image
+
+No toolchain needed. You need the CyberPi on USB, Python (for esptool) and
+the shareware `doom1.wad` v1.9 (4,196,020 bytes, MD5
+`f0cefca49926d00903cf57551d901abe`; it's freely distributable but not
+included here, e.g. from RPM Fusion's `doom-shareware` package).
+
+1. **Back up the stock firmware** first ([backup/README.md](backup/README.md)).
+   Flashing Doom replaces it, and the backup is the only way back.
+2. Download `cyberdoom-<version>.bin` from the
+   [Releases](https://github.com/the-parts-bin/cyberpi-doom/releases) page.
+3. Flash the image at 0 and the WAD at 0x200000:
+
+   ```sh
+   pip install esptool
+   esptool --port /dev/ttyUSB0 --baud 460800 write-flash \
+       0x0 cyberdoom-v1.0.bin 0x200000 doom1.wad
+   ```
+
+   Use your CyberPi's port (`/dev/ttyUSB*` on Linux,
+   `/dev/cu.wchusbserial*` on macOS, `COMx` on Windows). Keep the baud rate
+   at 460800 or lower: the CyberPi's USB-serial chip (CH340) corrupts data
+   at 921600. Older esptool versions are called `esptool.py` and spell the
+   command `write_flash`.
+
+   Without Python, Espressif's browser flasher
+   (<https://espressif.github.io/esptool-js/>, Chrome or Edge) does the same:
+   connect at 460800, add the image at `0x0` and `doom1.wad` at `0x200000`,
+   then Program.
+
+4. esptool restarts the CyberPi when it's done (with the browser flasher,
+   unplug and replug it). It boots into the start screen; see [doom/README.md](doom/README.md) for controls and
+   network games. Every CyberPi in a network game needs the same version.
+
+To update to a newer image later, flash just the image at 0x0; the WAD and
+your saves and settings stay.
+
+## Build from source
 
 1. **Back up the stock firmware** first ([backup/README.md](backup/README.md)).
    Flashing Doom replaces it.
