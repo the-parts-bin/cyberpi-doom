@@ -107,6 +107,18 @@ press, `a` / `b` the A / B buttons, `m` menu (capitals hold for a second).
 MD5 `f0cefca49926d00903cf57551d901abe`), e.g. from RPM Fusion's
 `doom-shareware` package, and put it in `wad/`.
 
+### Releasing
+
+```sh
+esptool.py --chip esp32 merge_bin -o cyberdoom-vX.Y.bin @build/flash_args   # run in doom/
+```
+
+Attach the image to a GitHub release (tag `vX.Y`). The web installer lives in
+the site repo (`the-parts-bin.github.io`, `tools/cyberpi-doom/`) and serves its
+own copy of the firmware, since browsers can't fetch release downloads from
+another origin: copy the image into `tools/cyberpi-doom/firmware/` there and
+update `latest.json`.
+
 ## Layout
 
 | Partition | Offset | Size | Contents |

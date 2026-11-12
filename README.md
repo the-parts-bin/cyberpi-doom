@@ -23,8 +23,12 @@ a speaker.
 
 ## Install the prebuilt image
 
-No toolchain needed. You need the CyberPi on USB, Python (for esptool) and
-the shareware `doom1.wad` v1.9 (4,196,020 bytes, MD5
+The easiest way is the **[web installer](https://the-parts-bin.github.io/tools/cyberpi-doom/)**
+(Chrome or Edge on a computer): one button to back up the CyberPi, one to
+install Doom, one to restore a backup.
+
+From the command line, no toolchain is needed either: you need the CyberPi
+on USB, Python (for esptool) and the shareware `doom1.wad` v1.9 (4,196,020 bytes, MD5
 `f0cefca49926d00903cf57551d901abe`; it's freely distributable but not
 included here, e.g. from RPM Fusion's `doom-shareware` package).
 
