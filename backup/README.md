@@ -3,9 +3,9 @@
 Flashing Doom overwrites the whole 8 MB flash, including Makeblock's firmware.
 Make a full flash dump first, so the CyberPi can be put back exactly as it was.
 
-The dumps themselves (`*.bin`) are not in git: they're 8 MB each and contain
-per-device data (MAC, calibration, NVS). Only the checksums of mine are
-tracked, in `SHA256SUMS`, as a reference.
+The dumps (`*.bin`) and their checksums (`SHA256SUMS`) are not in git:
+they're 8 MB each, contain per-device data (MAC, calibration, NVS), and only
+make sense next to the board they came from. Keep them locally.
 
 ## Tools
 

@@ -11,6 +11,7 @@ dependencies.lock
 # Upstream checkouts used for reference
 ref/
 
-# Large binaries, kept locally (checksums are tracked)
+# Large or per-device files, kept locally
 wad/*.wad
 backup/*.bin
+backup/SHA256SUMS
