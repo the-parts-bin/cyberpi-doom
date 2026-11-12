@@ -114,6 +114,16 @@ void ui_fill(int x, int y, int w, int h, uint16_t color)
             put(i, j, color);
 }
 
+void ui_darken(int x, int y, int w, int h)
+{
+    for (int j = y; j < y + h; j++)
+        for (int i = x; i < x + w; i++)
+            if ((unsigned)i < LCD_W && (unsigned)j < LCD_H) {
+                uint16_t c = BE(s_fb[j * LCD_W + i]);
+                s_fb[j * LCD_W + i] = BE((uint16_t)((c >> 1) & 0x7BEF));
+            }
+}
+
 static const uint8_t *glyph(char c)
 {
     if (c >= 'a' && c <= 'z')

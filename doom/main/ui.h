@@ -24,6 +24,8 @@ void ui_init(uint16_t *fb);
 
 void ui_clear(uint16_t color);
 void ui_fill(int x, int y, int w, int h, uint16_t color);
+// Halves the brightness of a rectangle, as a backdrop for text.
+void ui_darken(int x, int y, int w, int h);
 int ui_text_width(const char *s);
 // Draws s (upper-cased) with its top at y, returns the x after it.
 int ui_text(int x, int y, const char *s, uint16_t color);

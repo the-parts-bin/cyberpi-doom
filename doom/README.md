@@ -37,6 +37,8 @@ joystick (up/down picks a letter, left/right moves) and kept in
   mode (deathmatch, altdeath, co-op), map (E1M1–E1M9), skill, monsters and
   time limit, and starts with A. Menu leaves.
 - In deathmatch the HUD shows your frags in place of the keys.
+- The automap shows a scoreboard: every player in their colour with their
+  frags (deathmatch) or kills (co-op), best first.
 - Leaving a game, or losing the connection, returns to the start screen
   (with the reason, if it was an error); the others play on.
 

@@ -1,4 +1,5 @@
 // doomgeneric platform layer for the Makeblock CyberPi.
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -23,6 +24,7 @@
 #include "launcher.h"
 #include "m_config.h"
 #include "m_controls.h"
+#include "net_client.h"
 #include "netplay.h"
 #include "r_state.h"
 #include "remote.h"
@@ -51,8 +53,15 @@ static const char *TAG = "doom";
 // HUD values into internal RAM and hands them to a core 0 task that scales
 // and pushes, dropping the frame if that task is still busy with the last one.
 typedef struct {
+    int8_t player;
+    int16_t score;
+} score_t;
+
+typedef struct {
     bool tall;
     hud_state_t hud;
+    score_t scores[MAXPLAYERS]; // network game automap overlay, best first
+    int num_scores;
     uint32_t pal[256];
 } frame_info_t;
 
@@ -119,6 +128,29 @@ static IRAM_ATTR void convert_frame(const uint8_t *src, const uint32_t *pal,
     }
 }
 
+// Scoreboard over the automap in network games: one line per player in their
+// colour, with frags (deathmatch) or kills (co-op).
+static void draw_scores(const frame_info_t *f)
+{
+    static const uint16_t colors[MAXPLAYERS] = {
+        UI_RGB(60, 200, 60), UI_RGB(130, 130, 240), UI_RGB(180, 125, 60), UI_RGB(230, 50, 50),
+    };
+    if (f->num_scores == 0)
+        return;
+
+    ui_darken(0, 0, LCD_W, f->num_scores * UI_LINE + 3);
+    for (int i = 0; i < f->num_scores; i++) {
+        const score_t *sc = &f->scores[i];
+        int y = 2 + i * UI_LINE;
+        char num[8];
+        snprintf(num, sizeof(num), "%d", sc->score);
+        uint16_t text = sc->player == consoleplayer ? UI_WHITE : UI_GREY;
+        ui_fill(4, y + 1, 5, 5, colors[sc->player]);
+        ui_text(13, y, net_client_wait_data.player_names[sc->player], text);
+        ui_text(LCD_W - 4 - ui_text_width(num), y, num, text);
+    }
+}
+
 static void video_task(void *arg)
 {
     int was_tall = -1; // first frame: clear what the launcher or lobby left
@@ -133,6 +165,7 @@ static void video_task(void *arg)
         if (f->tall) {
             convert_frame(s_snap, f->pal, s_ys_tall, TALL_H, 0);
             hud_draw(s_fb, TALL_H, &f->hud);
+            draw_scores(f);
         } else {
             convert_frame(s_snap, f->pal, s_ys_classic, CLASSIC_H, CLASSIC_Y);
         }
@@ -188,6 +221,30 @@ static void snapshot_columns(uint8_t *dst, const uint8_t *src)
     }
 }
 
+static void read_scores(frame_info_t *f)
+{
+    f->num_scores = 0;
+    if (!netgame || !automapactive)
+        return;
+    for (int i = 0; i < MAXPLAYERS; i++) {
+        if (!playeringame[i])
+            continue;
+        int score = players[i].killcount;
+        if (deathmatch) {
+            score = 0;
+            for (int j = 0; j < MAXPLAYERS; j++)
+                score += j == i ? -players[i].frags[j] : players[i].frags[j];
+        }
+        // insertion sort, best first
+        int k = f->num_scores++;
+        while (k > 0 && f->scores[k - 1].score < score) {
+            f->scores[k] = f->scores[k - 1];
+            k--;
+        }
+        f->scores[k] = (score_t){i, score};
+    }
+}
+
 static void read_hud(hud_state_t *h)
 {
     const player_t *p = &players[consoleplayer];
@@ -236,8 +293,10 @@ void DG_DrawFrame(void)
         snapshot_columns(s_snap, I_VideoBuffer);
         memcpy(f->pal, s_pal, sizeof(s_pal));
         f->tall = gamestate == GS_LEVEL;
-        if (f->tall)
+        if (f->tall) {
             read_hud(&f->hud);
+            read_scores(f);
+        }
         s_video_busy = true;
         xSemaphoreGive(s_frame_ready);
     }
